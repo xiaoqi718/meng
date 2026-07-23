@@ -70,11 +70,25 @@ meng/
 
 ## 使用说明
 
-1. 打开网页后，在左侧输入你的 DeepSeek API Key（也可以提前写在 `.env` 里）。
-2. 上传你的 PDF 简历。
-3. 点击「开始分析」。
-4. 查看评分、问题和优化后的简历。
-5. 复制优化结果，粘贴到你的简历里。
+1. 打开网页后，上传你的 PDF 简历。
+2. 点击「开始分析」。
+3. 查看评分、问题和优化后的简历。
+4. 复制优化结果，粘贴到你的简历里。
+
+## 部署到 Streamlit Cloud
+
+1. Fork 或推送本仓库到你的 GitHub
+2. 登录 [Streamlit Cloud](https://share.streamlit.io)
+3. 点击 **New app**，选择仓库 `你的用户名/meng`，主文件路径填 `app.py`
+4. 部署完成后，进入应用设置 → **Secrets**，添加：
+
+```toml
+DEEPSEEK_API_KEY = "your_api_key_here"
+```
+
+5. 重启应用即可
+
+> ⚠️ **安全提醒**：不要将真实的 API Key 写入代码或 `.env.example` 中提交到 GitHub。
 
 ## 后续计划
 
