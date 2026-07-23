@@ -64,25 +64,28 @@ def extract_score_section(text: str) -> tuple[str, str]:
     return "", text
 
 
+def get_api_key() -> str:
+    """
+    获取 DeepSeek API Key
+    线上优先从 Streamlit Secrets 读取，本地从 .env 环境变量读取
+    """
+    # 线上环境：Streamlit Cloud Secrets
+    try:
+        return st.secrets["DEEPSEEK_API_KEY"]
+    except (KeyError, AttributeError):
+        pass
+
+    # 本地环境：.env 文件
+    return os.getenv("DEEPSEEK_API_KEY", "")
+
+
 # 侧边栏
 def render_sidebar():
     st.sidebar.title("⚙️ 设置")
-
-    # API Key
-    env_key = os.getenv("DEEPSEEK_API_KEY", "")
-    api_key = st.sidebar.text_input(
-        "DeepSeek API Key",
-        value=env_key,
-        type="password",
-        placeholder="请输入你的 API Key",
-        help="没有 API Key？去 platform.deepseek.com 注册获取",
-    )
-
-    st.sidebar.markdown("---")
     st.sidebar.markdown("### 关于 meng")
     st.sidebar.markdown("上传简历 PDF，AI 帮你优化，让简历更值钱。")
-
-    return api_key
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("[GitHub 仓库](https://github.com/xiaoqi718/meng)")
 
 
 # 主界面
@@ -115,13 +118,18 @@ def render_main():
 
 
 def main():
-    api_key = render_sidebar()
+    render_sidebar()
     uploaded_file, analyze_button = render_main()
 
     if analyze_button:
         # 校验
+        api_key = get_api_key()
         if not api_key:
-            st.error("⚠️ 请先输入 DeepSeek API Key")
+            st.error(
+                "⚠️ 未配置 DeepSeek API Key。"
+                "线上请在 Streamlit Cloud Secrets 中配置；"
+                "本地请在 .env 文件中配置。"
+            )
             return
 
         if uploaded_file is None:
