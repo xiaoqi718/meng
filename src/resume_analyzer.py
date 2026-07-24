@@ -67,7 +67,7 @@ SYSTEM_PROMPT = """你是李明，一位在互联网和快消行业做了 12 年
 def analyze_resume(
     resume_text: str,
     api_key: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     base_url: str = "https://api.deepseek.com/v1",
 ) -> str:
     """
