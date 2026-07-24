@@ -26,78 +26,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 自定义样式：我的世界（Minecraft）风格 - 精致封面级
+# 自定义样式：Minecraft 风格（简化版，确保内容可见）
 st.markdown(
     """
     <style>
     /* 导入像素字体 */
     @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Press+Start+2P&display=swap');
 
-    /* 全局背景：多层天空渐变 */
+    /* 全局背景：Minecraft 天空+草地 */
     .stApp {
-        background:
-            linear-gradient(180deg,
-                #4FC3F7 0%,
-                #64B5F6 20%,
-                #90CAF9 40%,
-                #B3E5FC 55%,
-                transparent 55%),
-            linear-gradient(180deg,
-                #7CB342 55%,
-                #689F38 65%,
-                #558B2F 80%,
-                #33691E 100%);
+        background: linear-gradient(180deg,
+            #4FC3F7 0%,
+            #64B5F6 25%,
+            #90CAF9 45%,
+            #B3E5FC 55%,
+            #7CB342 55%,
+            #689F38 75%,
+            #558B2F 100%);
         background-attachment: fixed;
-        background-size: 100% 100%;
-        position: relative;
     }
 
-    /* 场景层：远山 */
-    .stApp::before {
-        content: "";
-        position: fixed;
-        left: 0;
-        right: 0;
-        top: 30%;
-        height: 25%;
-        background-image:
-            linear-gradient(180deg, transparent 0%, transparent 40%, #78909C 40%, #78909C 60%, #90A4AE 60%, #90A4AE 80%, #B0BEC5 80%, #B0BEC5 100%);
-        clip-path: polygon(
-            0% 100%, 0% 70%,
-            5% 55%, 10% 65%, 15% 40%, 20% 55%, 25% 35%, 30% 50%,
-            38% 25%, 45% 45%, 52% 30%, 60% 50%, 68% 20%, 75% 45%,
-            82% 30%, 90% 50%, 95% 40%, 100% 55%, 100% 100%
-        );
-        z-index: -2;
-        opacity: 0.8;
-        pointer-events: none;
-    }
-
-    /* 场景层：草地纹理 + 树 */
-    .stApp::after {
-        content: "";
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 40%;
-        background:
-            /* 树1 */
-            radial-gradient(circle at 12% 65%, #2E7D32 0%, #2E7D32 4%, transparent 4.5%),
-            radial-gradient(circle at 12% 62%, #388E3C 0%, #388E3C 5%, transparent 5.5%),
-            /* 树2 */
-            radial-gradient(circle at 88% 70%, #2E7D32 0%, #2E7D32 5%, transparent 5.5%),
-            radial-gradient(circle at 88% 66%, #388E3C 0%, #388E3C 6%, transparent 6.5%),
-            /* 树3 */
-            radial-gradient(circle at 35% 80%, #2E7D32 0%, #2E7D32 3%, transparent 3.5%),
-            /* 树4 */
-            radial-gradient(circle at 72% 78%, #2E7D32 0%, #2E7D32 3.5%, transparent 4%);
-        z-index: -1;
-        pointer-events: none;
-    }
-
-    /* 隐藏 Streamlit 顶部和底部多余元素 */
-    header {visibility: hidden;}
+    /* 隐藏 Streamlit 底部和多余元素 */
     footer {visibility: hidden;}
     .stDeployButton {display: none !important;}
     #MainMenu {visibility: hidden;}
@@ -107,18 +56,15 @@ st.markdown(
         max-width: 820px;
         padding-top: 2rem;
         padding-bottom: 2rem;
-        position: relative;
-        z-index: 10;
     }
 
     /* Minecraft 风格卡片：橡木箱质感 */
     .glass-card {
-        background:
-            linear-gradient(180deg,
-                #6D4C2E 0%,
-                #5D3E24 3%,
-                #6D4C2E 6%,
-                #5D3E24 100%);
+        background: linear-gradient(180deg,
+            #6D4C2E 0%,
+            #5D3E24 3%,
+            #6D4C2E 6%,
+            #5D3E24 100%);
         border: none;
         border-radius: 0px;
         padding: 2rem;
@@ -193,12 +139,11 @@ st.markdown(
         font-weight: 700;
         font-family: 'ZCOOL KuaiLe', sans-serif !important;
         letter-spacing: 2px;
-        background:
-            linear-gradient(180deg,
-                #8BC34A 0%,
-                #7CB342 30%,
-                #689F38 70%,
-                #558B2F 100%) !important;
+        background: linear-gradient(180deg,
+            #8BC34A 0%,
+            #7CB342 30%,
+            #689F38 70%,
+            #558B2F 100%) !important;
         border: none !important;
         color: #FFFFFF !important;
         text-shadow:
@@ -217,12 +162,11 @@ st.markdown(
     }
 
     .stButton>button:hover {
-        background:
-            linear-gradient(180deg,
-                #9CCC65 0%,
-                #8BC34A 30%,
-                #7CB342 70%,
-                #689F38 100%) !important;
+        background: linear-gradient(180deg,
+            #9CCC65 0%,
+            #8BC34A 30%,
+            #7CB342 70%,
+            #689F38 100%) !important;
         transform: translateY(-2px);
     }
 
@@ -237,12 +181,11 @@ st.markdown(
 
     /* 下载按钮：金色钻石风 */
     .stDownloadButton>button {
-        background:
-            linear-gradient(180deg,
-                #FFD54F 0%,
-                #FFC107 40%,
-                #FFA000 80%,
-                #FF8F00 100%) !important;
+        background: linear-gradient(180deg,
+            #FFD54F 0%,
+            #FFC107 40%,
+            #FFA000 80%,
+            #FF8F00 100%) !important;
         box-shadow:
             0 0 0 3px #E65100,
             0 0 0 6px #FFB300,
@@ -254,10 +197,9 @@ st.markdown(
 
     /* 文件上传区：木箱 */
     .stFileUploader {
-        background:
-            linear-gradient(180deg,
-                rgba(139, 111, 71, 0.3) 0%,
-                rgba(93, 62, 36, 0.4) 100%);
+        background: linear-gradient(180deg,
+            rgba(139, 111, 71, 0.3) 0%,
+            rgba(93, 62, 36, 0.4) 100%);
         border: 3px dashed #8B6F47 !important;
         border-radius: 0px;
         padding: 1.5rem;
@@ -356,113 +298,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# Minecraft 场景：飘浮的方块云 + 掉落的方块
-particles_html = """
-<div class="mc-scene" style="
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    overflow: hidden;
-    pointer-events: none;
-">
-"""
-
-# 云朵（像素风）
-cloud_positions = [
-    (10, 8, 12), (45, 5, 18), (75, 12, 10), (25, 18, 8), (85, 22, 14)
-]
-for left, top, duration in cloud_positions:
-    particles_html += f"""
-    <div style="
-        position: absolute;
-        left: {left}%;
-        top: {top}%;
-        width: 80px;
-        height: 30px;
-        background: white;
-        box-shadow:
-            -20px 0 0 0 white,
-            20px 0 0 0 white,
-            40px -10px 0 0 white,
-            -40px -10px 0 0 white,
-            0 -15px 0 0 white,
-            25px -20px 0 0 white,
-            -25px -20px 0 0 white;
-        opacity: 0.9;
-        animation: cloudDrift {duration}s linear infinite;
-        image-rendering: pixelated;
-    "></div>
-    """
-
-# Minecraft 方块颜色（更真实）
-block_colors = [
-    ("#7CB342", "#558B2F"),   # 草方块顶
-    ("#8D6E63", "#5D4037"),   # 泥土
-    ("#9E9E9E", "#616161"),   # 石头
-    ("#FFD54F", "#F57C00"),   # 金子
-    ("#8D6E63", "#5D4037"),   # 木头
-    ("#4FC3F7", "#0288D1"),   # 钻石
-    ("#FF7043", "#D84315"),   # 红石
-    ("#EEEEEE", "#BDBDBD"),   # 铁块
-]
-
-# 掉落的方块（更多，更真实）
-for i in range(45):
-    left = (i * 2.3) % 100
-    delay = (i * 0.35) % 10
-    duration = 8 + (i % 10)
-    size = 12 + (i % 4) * 4
-    rotate = (i * 30) % 360
-    color, border = block_colors[i % len(block_colors)]
-    particles_html += f"""
-    <div style="
-        position: absolute;
-        width: {size}px;
-        height: {size}px;
-        background: {color};
-        box-shadow:
-            inset -{size//4}px -{size//4}px 0 rgba(0,0,0,0.3),
-            inset {size//4}px {size//4}px 0 rgba(255,255,255,0.25);
-        left: {left}%;
-        top: -30px;
-        animation: blockFall {duration}s linear {delay}s infinite;
-        image-rendering: pixelated;
-        transform: rotate({rotate}deg);
-    "></div>
-    """
-
-particles_html += """
-</div>
-<style>
-@keyframes blockFall {
-    0% {
-        transform: translateY(-30px) rotate(0deg);
-        opacity: 0;
-    }
-    5% {
-        opacity: 0.7;
-    }
-    95% {
-        opacity: 0.6;
-    }
-    100% {
-        transform: translateY(110vh) rotate(360deg);
-        opacity: 0;
-    }
-}
-
-@keyframes cloudDrift {
-    0% { transform: translateX(-50px); }
-    100% { transform: translateX(calc(100vw + 100px)); }
-}
-</style>
-"""
-
-st.components.v1.html(particles_html, height=0)
 
 
 def extract_score_section(text: str) -> tuple[str, str]:
