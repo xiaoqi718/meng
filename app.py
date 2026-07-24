@@ -3,6 +3,7 @@ meng - AI 简历优化器
 Streamlit 前端主程序
 """
 
+import base64
 import os
 import re
 import tempfile
@@ -12,11 +13,24 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from src.resume_analyzer import analyze_resume
-from src.resume_exporter import export_optimized_resume_to_docx
 from src.resume_parser import extract_text_from_pdf
 
 # 加载 .env 文件
 load_dotenv()
+
+
+def get_background_css() -> str:
+    """
+    读取 assets/background.jpg 并转为 base64 CSS 背景
+    如果图片不存在，返回空字符串（使用默认背景色）
+    """
+    image_path = Path("assets/background.jpg")
+    if image_path.exists():
+        with open(image_path, "rb") as img_file:
+            encoded = base64.b64encode(img_file.read()).decode()
+        return f"url('data:image/jpeg;base64,{encoded}')"
+    return ""
+
 
 # 页面配置
 st.set_page_config(
@@ -26,97 +40,101 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# 自定义样式：简约专业 SaaS 风格
+bg_image = get_background_css()
+
+# 自定义样式：简约专业 SaaS 风格 + 背景图
 st.markdown(
-    """
+    f"""
     <style>
     /* 页面背景 */
-    .stApp {
+    .stApp {{
         background-color: #F8FAFC;
-    }
+        {"background: linear-gradient(rgba(248, 250, 252, 0.88), rgba(248, 250, 252, 0.88)), " + bg_image + " center/cover no-repeat fixed;" if bg_image else ""}
+    }}
 
     /* 隐藏 Streamlit 底部和多余元素 */
-    footer {visibility: hidden;}
-    .stDeployButton {display: none !important;}
-    #MainMenu {visibility: hidden;}
+    footer {{visibility: hidden;}}
+    .stDeployButton {{display: none !important;}}
+    #MainMenu {{visibility: hidden;}}
 
     /* 主容器 */
-    .main .block-container {
+    .main .block-container {{
         max-width: 960px;
         padding-top: 1.5rem;
         padding-bottom: 3rem;
-    }
+    }}
 
     /* 卡片 */
-    .card {
-        background: #FFFFFF;
+    .card {{
+        background: rgba(255, 255, 255, 0.96);
         border-radius: 16px;
         padding: 28px;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(226, 232, 240, 0.8);
         margin-bottom: 24px;
-    }
+        backdrop-filter: blur(8px);
+    }}
 
-    .card-title {
+    .card-title {{
         font-size: 1.25rem !important;
         font-weight: 700 !important;
         color: #0F172A !important;
         margin-bottom: 1rem !important;
-    }
+    }}
 
-    .card-subtitle {
+    .card-subtitle {{
         font-size: 0.95rem;
         color: #64748B;
         line-height: 1.6;
-    }
+    }}
 
     /* Header 区域 */
-    .app-header {
+    .app-header {{
         text-align: center;
         margin-bottom: 2rem;
-    }
+    }}
 
-    .app-logo {
+    .app-logo {{
         font-size: 2rem;
         font-weight: 800;
         color: #2563EB;
         letter-spacing: -1px;
         margin-bottom: 0.25rem;
-    }
+    }}
 
-    .app-title {
+    .app-title {{
         font-size: 1.75rem !important;
         font-weight: 700 !important;
         color: #0F172A !important;
         margin-bottom: 0.5rem !important;
-    }
+    }}
 
-    .app-subtitle {
+    .app-subtitle {{
         font-size: 1rem;
         color: #64748B;
         line-height: 1.6;
-    }
+    }}
 
     /* 上传区 */
-    .stFileUploader {
+    .stFileUploader {{
         background: #FFFFFF;
         border: 2px dashed #CBD5E1 !important;
         border-radius: 12px;
         padding: 1.5rem;
-    }
+    }}
 
-    .stFileUploader:hover {
+    .stFileUploader:hover {{
         border-color: #2563EB !important;
-    }
+    }}
 
     .stFileUploader label,
     .stFileUploader > div > div,
-    .stFileUploader small {
+    .stFileUploader small {{
         color: #475569 !important;
-    }
+    }}
 
     /* 按钮 */
-    .stButton > button {
+    .stButton > button {{
         width: 100%;
         border-radius: 10px;
         height: 3rem;
@@ -127,125 +145,110 @@ st.markdown(
         border: none !important;
         box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15);
         transition: all 0.15s ease;
-    }
+    }}
 
-    .stButton > button:hover {
+    .stButton > button:hover {{
         background-color: #1D4ED8 !important;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-    }
+    }}
 
-    .stButton > button:active {
+    .stButton > button:active {{
         transform: translateY(0);
-    }
+    }}
 
-    .stButton > button:disabled {
+    .stButton > button:disabled {{
         background-color: #94A3B8 !important;
-    }
-
-    /* 下载按钮 */
-    .stDownloadButton > button {
-        background-color: #FFFFFF !important;
-        color: #2563EB !important;
-        border: 1.5px solid #2563EB !important;
-        border-radius: 10px;
-        font-weight: 600;
-        height: 2.75rem;
-        transition: all 0.15s ease;
-    }
-
-    .stDownloadButton > button:hover {
-        background-color: #EFF6FF !important;
-    }
+    }}
 
     /* 评分卡片 */
-    .score-card {
+    .score-card {{
         background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
         border-radius: 16px;
         padding: 24px;
         color: white;
         text-align: center;
-    }
+    }}
 
-    .score-number {
+    .score-number {{
         font-size: 3rem;
         font-weight: 800;
         line-height: 1;
         margin-bottom: 0.5rem;
-    }
+    }}
 
-    .score-label {
+    .score-label {{
         font-size: 0.9rem;
         opacity: 0.9;
-    }
+    }}
 
     /* 标签 */
-    .badge {
+    .badge {{
         display: inline-block;
         padding: 6px 14px;
         border-radius: 999px;
         font-size: 0.85rem;
         font-weight: 600;
-    }
+    }}
 
-    .badge-success { background: #D1FAE5; color: #065F46; }
-    .badge-warning { background: #FEF3C7; color: #92400E; }
-    .badge-danger { background: #FEE2E2; color: #991B1B; }
-    .badge-info { background: #DBEAFE; color: #1E40AF; }
+    .badge-success {{ background: #D1FAE5; color: #065F46; }}
+    .badge-warning {{ background: #FEF3C7; color: #92400E; }}
+    .badge-danger {{ background: #FEE2E2; color: #991B1B; }}
+    .badge-info {{ background: #DBEAFE; color: #1E40AF; }}
 
     /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
         border-bottom: 1px solid #E2E8F0;
-    }
+    }}
 
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] {{
         padding: 12px 20px;
         font-weight: 600;
         color: #64748B;
         border-radius: 8px 8px 0 0;
-    }
+    }}
 
-    .stTabs [aria-selected="true"] {
+    .stTabs [aria-selected="true"] {{
         color: #2563EB !important;
         background: #EFF6FF;
-    }
+    }}
 
     /* Expander */
-    .streamlit-expanderHeader {
+    .streamlit-expanderHeader {{
         font-weight: 600 !important;
         color: #0F172A !important;
         background: #F8FAFC;
         border-radius: 10px;
         padding: 14px 16px !important;
-    }
+    }}
 
-    .streamlit-expander {
+    .streamlit-expander {{
         border: 1px solid #E2E8F0;
         border-radius: 12px;
         margin-bottom: 12px;
         background: #FFFFFF;
-    }
+    }}
 
     /* 提示框 */
-    .stAlert {
+    .stAlert {{
         border-radius: 12px !important;
         border: 1px solid #E2E8F0 !important;
-    }
+    }}
 
-    .stAlert [data-testid="stMarkdownContainer"] p {
+    .stAlert [data-testid="stMarkdownContainer"] p {{
         color: #0F172A !important;
-    }
+    }}
 
     /* 分隔线 */
-    hr {
+    hr {{
         border: none !important;
         border-top: 1px solid #E2E8F0 !important;
         margin: 1.5rem 0 !important;
-    }
+    }}
 
     /* 简历预览 */
-    .resume-preview {
+    .resume-preview {{
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
         border-radius: 12px;
@@ -253,65 +256,26 @@ st.markdown(
         line-height: 1.7;
         color: #0F172A;
         font-size: 0.95rem;
-    }
+    }}
 
     .resume-preview h1,
     .resume-preview h2,
-    .resume-preview h3 {
+    .resume-preview h3 {{
         color: #0F172A !important;
         margin-top: 1.2rem;
         margin-bottom: 0.6rem;
-    }
+    }}
 
-    .resume-preview p {
+    .resume-preview p {{
         margin-bottom: 0.5rem;
-    }
+    }}
 
     /* 小字说明 */
-    .hint-text {
+    .hint-text {{
         font-size: 0.85rem;
         color: #94A3B8;
         margin-top: 0.5rem;
-    }
-
-    /* 步骤条 */
-    .step-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        color: #64748B;
-        font-size: 0.9rem;
-    }
-
-    .step-number {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background: #E2E8F0;
-        color: #64748B;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        font-weight: 700;
-        flex-shrink: 0;
-    }
-
-    .step-active .step-number {
-        background: #2563EB;
-        color: white;
-    }
-
-    .step-active {
-        color: #0F172A;
-        font-weight: 600;
-    }
-
-    .step-done .step-number {
-        background: #10B981;
-        color: white;
-    }
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -391,7 +355,7 @@ def render_header():
             <div class="app-logo">meng</div>
             <div class="app-title">AI 简历优化器</div>
             <div class="app-subtitle">
-                保留你的真实经历，只改弱项 · 让 HR 一眼想约面试
+                上传简历 · AI 诊断问题 · 输出优化版本
             </div>
         </div>
         ''',
@@ -410,12 +374,12 @@ def render_upload_card():
             '''
             <div class="card-title">📄 上传简历</div>
             <div class="card-subtitle">
-                支持 PDF 格式。AI 会基于你上传的简历进行润色，保留原有结构和真实信息，只修改表达弱、缺少量化的部分。
+                支持 PDF 格式。AI 会分析你的简历，指出问题并直接输出一份优化后的完整版本。
             </div>
             <ul style="color: #64748B; font-size: 0.9rem; line-height: 1.8; margin-top: 1rem; padding-left: 1.2rem;">
-                <li>保留原简历模块顺序</li>
-                <li>绝不编造经历和数字</li>
-                <li>突出成果、简洁表达</li>
+                <li>AI 诊断简历问题</li>
+                <li>输出标准结构优化版</li>
+                <li>保留真实信息，不编造经历</li>
             </ul>
             ''',
             unsafe_allow_html=True,
@@ -454,27 +418,10 @@ def render_analyze_button(uploaded_file):
 
 def render_progress(step: int):
     """渲染步骤进度 1=读取 2=分析 3=完成"""
-    steps = [
-        (1, "读取 PDF 内容"),
-        (2, "AI 审阅简历"),
-        (3, "生成优化版本"),
-    ]
-
-    html = '<div class="card" style="padding: 20px 28px;">'
-    for num, label in steps:
-        cls = "step-item"
-        if num < step:
-            cls += " step-done"
-        elif num == step:
-            cls += " step-active"
-        html += f'''
-        <div class="{cls}">
-            <div class="step-number">{num if num > step else "✓"}</div>
-            <div>{label}</div>
-        </div>
-        '''
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    steps = ["读取 PDF 内容", "AI 审阅简历", "生成优化版本"]
+    progress_value = step / len(steps)
+    current_label = steps[step - 1] if 1 <= step <= len(steps) else "完成"
+    st.progress(progress_value, text=f"步骤 {step}/{len(steps)}：{current_label}")
 
 
 def render_score_section(score: str, analysis_text: str):
@@ -591,16 +538,8 @@ def render_analysis_tab(analysis_text: str):
         st.info("未识别到结构化的问题和建议，下面是完整分析内容：")
         st.markdown(analysis_text)
 
-    # 修改摘要
-    summary_match = re.search(r"#{1,3}\s*修改摘要\s*\n(.*?)(?=#{1,3}|$)", analysis_text, re.DOTALL)
-    if summary_match:
-        st.markdown("---")
-        st.markdown('<div class="card-title">📝 修改摘要</div>', unsafe_allow_html=True)
-        summary = summary_match.group(1).strip()
-        st.markdown(summary)
 
-
-def render_resume_tab(resume_text: str, full_result: str):
+def render_resume_tab(resume_text: str):
     """渲染优化后简历 tab"""
     st.markdown(
         '''
@@ -610,33 +549,6 @@ def render_resume_tab(resume_text: str, full_result: str):
     )
     st.markdown(resume_text)
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # 下载按钮
-    st.markdown("---")
-    st.markdown('<div class="card-title">📥 下载优化结果</div>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button(
-            label="📄 完整分析报告（Markdown）",
-            data=full_result,
-            file_name="简历优化报告.md",
-            mime="text/markdown",
-            use_container_width=True,
-        )
-
-    with col2:
-        try:
-            docx_buffer, _ = export_optimized_resume_to_docx(full_result)
-            st.download_button(
-                label="📘 优化后简历（Word）",
-                data=docx_buffer,
-                file_name="优化后的简历.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True,
-            )
-        except Exception as e:
-            st.warning(f"⚠️ Word 生成失败：{e}")
 
 
 def main():
@@ -721,7 +633,7 @@ def main():
         with tab_resume:
             st.markdown('<div class="card" style="margin-top: 0;">', unsafe_allow_html=True)
             if resume_part:
-                render_resume_tab(resume_part, result)
+                render_resume_tab(resume_part)
             else:
                 st.warning("未从分析结果中提取到优化后的简历")
             st.markdown('</div>', unsafe_allow_html=True)
