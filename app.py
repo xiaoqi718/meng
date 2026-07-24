@@ -4,12 +4,14 @@ Streamlit 前端主程序
 """
 
 import base64
+import json
 import os
 import re
 import tempfile
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from src.resume_analyzer import analyze_resume
@@ -58,14 +60,17 @@ st.set_page_config(
 
 bg_image = get_background_css()
 
-# 自定义样式：简约专业 SaaS 风格 + 背景图
+# 自定义样式：深色玻璃拟态
 st.markdown(
     f"""
     <style>
-    /* 页面背景 */
+    /* 页面背景：深色 + 星空图 */
     .stApp {{
-        background-color: #F8FAFC;
-        {"background: linear-gradient(rgba(248, 250, 252, 0.88), rgba(248, 250, 252, 0.88)), " + bg_image + " center/cover no-repeat fixed;" if bg_image else ""}
+        background:
+            radial-gradient(ellipse at top, rgba(15, 23, 42, 0.75), rgba(2, 6, 23, 0.92)),
+            {bg_image if bg_image else "linear-gradient(180deg, #020617 0%, #0F172A 100%)"}
+            center/cover no-repeat fixed;
+        color: #F8FAFC;
     }}
 
     /* 隐藏 Streamlit 底部和多余元素 */
@@ -75,98 +80,115 @@ st.markdown(
 
     /* 主容器 */
     .main .block-container {{
-        max-width: 960px;
-        padding-top: 1.5rem;
-        padding-bottom: 3rem;
+        max-width: 1100px;
+        padding-top: 3rem;
+        padding-bottom: 4rem;
     }}
 
-    /* 卡片 */
-    .card {{
-        background: rgba(255, 255, 255, 0.96);
-        border-radius: 16px;
+    /* 玻璃卡片 */
+    .glass-card {{
+        background: rgba(15, 23, 42, 0.60);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-radius: 20px;
         padding: 28px;
-        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
-        border: 1px solid rgba(226, 232, 240, 0.8);
-        margin-bottom: 24px;
-        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        margin-bottom: 28px;
     }}
 
     .card-title {{
-        font-size: 1.25rem !important;
+        font-size: 1.15rem !important;
         font-weight: 700 !important;
-        color: #0F172A !important;
-        margin-bottom: 1rem !important;
+        color: #F8FAFC !important;
+        margin-bottom: 0.75rem !important;
+        letter-spacing: -0.3px;
     }}
 
     .card-subtitle {{
         font-size: 0.95rem;
-        color: #64748B;
+        color: #94A3B8;
         line-height: 1.6;
     }}
 
-    /* Header 区域 */
-    .app-header {{
+    /* Hero 区域 */
+    .hero {{
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 3rem;
+        padding: 2rem 0;
     }}
 
-    .app-logo {{
-        font-size: 2rem;
-        font-weight: 800;
-        color: #2563EB;
-        letter-spacing: -1px;
-        margin-bottom: 0.25rem;
+    .hero-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.15);
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        color: #60A5FA;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1.25rem;
     }}
 
-    .app-title {{
-        font-size: 1.75rem !important;
-        font-weight: 700 !important;
-        color: #0F172A !important;
-        margin-bottom: 0.5rem !important;
+    .hero-title {{
+        font-size: 3rem !important;
+        font-weight: 800 !important;
+        color: #F8FAFC !important;
+        letter-spacing: -2px;
+        margin-bottom: 0.75rem !important;
+        background: linear-gradient(135deg, #F8FAFC 0%, #60A5FA 50%, #818CF8 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }}
 
-    .app-subtitle {{
-        font-size: 1rem;
-        color: #64748B;
+    .hero-subtitle {{
+        font-size: 1.1rem;
+        color: #94A3B8;
         line-height: 1.6;
+        max-width: 560px;
+        margin: 0 auto;
     }}
 
     /* 上传区 */
     .stFileUploader {{
-        background: #FFFFFF;
-        border: 2px dashed #CBD5E1 !important;
-        border-radius: 12px;
-        padding: 1.5rem;
+        background: rgba(15, 23, 42, 0.40) !important;
+        backdrop-filter: blur(12px);
+        border: 2px dashed rgba(255, 255, 255, 0.15) !important;
+        border-radius: 16px;
+        padding: 2rem;
     }}
 
     .stFileUploader:hover {{
-        border-color: #2563EB !important;
+        border-color: rgba(59, 130, 246, 0.60) !important;
+        background: rgba(15, 23, 42, 0.50) !important;
     }}
 
     .stFileUploader label,
     .stFileUploader > div > div,
     .stFileUploader small {{
-        color: #475569 !important;
+        color: #CBD5E1 !important;
     }}
 
     /* 按钮 */
     .stButton > button {{
         width: 100%;
-        border-radius: 10px;
+        border-radius: 12px;
         height: 3rem;
         font-size: 1rem;
         font-weight: 600;
-        background-color: #2563EB !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%) !important;
         color: #FFFFFF !important;
         border: none !important;
-        box-shadow: 0 1px 2px rgba(37, 99, 235, 0.15);
-        transition: all 0.15s ease;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.30);
+        transition: all 0.2s ease;
     }}
 
     .stButton > button:hover {{
-        background-color: #1D4ED8 !important;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.45);
     }}
 
     .stButton > button:active {{
@@ -174,28 +196,51 @@ st.markdown(
     }}
 
     .stButton > button:disabled {{
-        background-color: #94A3B8 !important;
+        background: rgba(148, 163, 184, 0.30) !important;
+        box-shadow: none;
     }}
 
-    /* 评分卡片 */
-    .score-card {{
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
-        border-radius: 16px;
-        padding: 24px;
-        color: white;
+    /* 评分区 */
+    .score-metric {{
         text-align: center;
     }}
 
     .score-number {{
-        font-size: 3rem;
+        font-size: 4rem;
         font-weight: 800;
         line-height: 1;
+        background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         margin-bottom: 0.5rem;
     }}
 
     .score-label {{
         font-size: 0.9rem;
-        opacity: 0.9;
+        color: #94A3B8;
+        font-weight: 500;
+    }}
+
+    .verdict-box {{
+        background: rgba(15, 23, 42, 0.40);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 20px;
+        height: 100%;
+    }}
+
+    .verdict-title {{
+        font-size: 0.85rem;
+        color: #94A3B8;
+        margin-bottom: 0.5rem;
+    }}
+
+    .verdict-text {{
+        font-size: 1.05rem;
+        color: #F8FAFC;
+        font-weight: 600;
+        line-height: 1.5;
     }}
 
     /* 标签 */
@@ -203,81 +248,88 @@ st.markdown(
         display: inline-block;
         padding: 6px 14px;
         border-radius: 999px;
-        font-size: 0.85rem;
-        font-weight: 600;
+        font-size: 0.8rem;
+        font-weight: 700;
     }}
 
-    .badge-success {{ background: #D1FAE5; color: #065F46; }}
-    .badge-warning {{ background: #FEF3C7; color: #92400E; }}
-    .badge-danger {{ background: #FEE2E2; color: #991B1B; }}
-    .badge-info {{ background: #DBEAFE; color: #1E40AF; }}
+    .badge-success {{ background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.25); }}
+    .badge-info {{ background: rgba(59, 130, 246, 0.15); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.25); }}
+    .badge-warning {{ background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.25); }}
+    .badge-danger {{ background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.25); }}
 
-    /* Tabs */
+    /* Tabs - pill 样式 */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 8px;
-        border-bottom: 1px solid #E2E8F0;
+        gap: 10px;
+        border-bottom: none;
+        margin-bottom: 1.5rem;
     }}
 
     .stTabs [data-baseweb="tab"] {{
-        padding: 12px 20px;
+        padding: 10px 22px;
         font-weight: 600;
-        color: #64748B;
-        border-radius: 8px 8px 0 0;
+        color: #94A3B8;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(15, 23, 42, 0.40);
     }}
 
     .stTabs [aria-selected="true"] {{
-        color: #2563EB !important;
-        background: #EFF6FF;
+        color: #FFFFFF !important;
+        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%) !important;
+        border-color: transparent !important;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
     }}
 
     /* Expander */
     .streamlit-expanderHeader {{
         font-weight: 600 !important;
-        color: #0F172A !important;
-        background: #F8FAFC;
-        border-radius: 10px;
-        padding: 14px 16px !important;
+        color: #F8FAFC !important;
+        background: rgba(15, 23, 42, 0.40);
+        border-radius: 12px;
+        padding: 14px 18px !important;
+        border: 1px solid rgba(255, 255, 255, 0.08);
     }}
 
     .streamlit-expander {{
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
         margin-bottom: 12px;
-        background: #FFFFFF;
+        background: rgba(15, 23, 42, 0.30);
     }}
 
     /* 提示框 */
     .stAlert {{
-        border-radius: 12px !important;
-        border: 1px solid #E2E8F0 !important;
+        background: rgba(15, 23, 42, 0.60) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 14px !important;
     }}
 
     .stAlert [data-testid="stMarkdownContainer"] p {{
-        color: #0F172A !important;
+        color: #F8FAFC !important;
     }}
 
     /* 分隔线 */
     hr {{
         border: none !important;
-        border-top: 1px solid #E2E8F0 !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
         margin: 1.5rem 0 !important;
     }}
 
     /* 简历预览 */
     .resume-preview {{
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        padding: 24px;
-        line-height: 1.7;
-        color: #0F172A;
+        background: rgba(15, 23, 42, 0.50);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 28px;
+        line-height: 1.75;
+        color: #E2E8F0;
         font-size: 0.95rem;
     }}
 
     .resume-preview h1,
     .resume-preview h2,
     .resume-preview h3 {{
-        color: #0F172A !important;
+        color: #F8FAFC !important;
         margin-top: 1.2rem;
         margin-bottom: 0.6rem;
     }}
@@ -289,8 +341,13 @@ st.markdown(
     /* 小字说明 */
     .hint-text {{
         font-size: 0.85rem;
-        color: #94A3B8;
+        color: #64748B;
         margin-top: 0.5rem;
+    }}
+
+    /* 进度条 */
+    .stProgress > div > div {{
+        background: linear-gradient(90deg, #3B82F6 0%, #6366F1 100%) !important;
     }}
     </style>
     """,
@@ -363,15 +420,17 @@ def get_score_badge(score_num: int) -> str:
         return '<span class="badge badge-danger">青铜级</span>'
 
 
-def render_header():
-    """渲染顶部标题"""
+def render_hero():
+    """渲染顶部 Hero"""
     st.markdown(
         '''
-        <div class="app-header">
-            <div class="app-logo">meng</div>
-            <div class="app-title">AI 简历优化器</div>
-            <div class="app-subtitle">
-                上传简历 · AI 诊断问题 · 输出优化版本
+        <div class="hero">
+            <div class="hero-badge">
+                ✨ AI 驱动的简历优化
+            </div>
+            <div class="hero-title">meng 简历优化器</div>
+            <div class="hero-subtitle">
+                10 年资深 HR + 行业专家视角，帮你找出简历真正的问题，直接输出能投递的优化版本
             </div>
         </div>
         ''',
@@ -379,40 +438,31 @@ def render_header():
     )
 
 
-def render_upload_card():
-    """渲染上传卡片"""
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+def render_upload_section():
+    """渲染上传区"""
+    st.markdown('<div class="glass-card" style="text-align: center; max-width: 640px; margin: 0 auto 2rem auto;">', unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 1])
+    st.markdown(
+        '''
+        <div class="card-title" style="margin-bottom: 0.5rem;">📄 上传你的简历</div>
+        <div class="card-subtitle" style="margin-bottom: 1.5rem;">
+            支持 PDF 格式。AI 会从 HR 和业务负责人双视角分析，指出问题并输出优化后的完整简历。
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
 
-    with col1:
-        st.markdown(
-            '''
-            <div class="card-title">📄 上传简历</div>
-            <div class="card-subtitle">
-                支持 PDF 格式。AI 会分析你的简历，指出问题并直接输出一份优化后的完整版本。
-            </div>
-            <ul style="color: #64748B; font-size: 0.9rem; line-height: 1.8; margin-top: 1rem; padding-left: 1.2rem;">
-                <li>AI 诊断简历问题</li>
-                <li>输出标准结构优化版</li>
-                <li>保留真实信息，不编造经历</li>
-            </ul>
-            ''',
-            unsafe_allow_html=True,
-        )
+    uploaded_file = st.file_uploader(
+        "拖拽或点击上传 PDF 简历",
+        type=["pdf"],
+        help="请上传文字版 PDF，扫描件/图片可能无法识别",
+        label_visibility="collapsed",
+    )
 
-    with col2:
-        uploaded_file = st.file_uploader(
-            "拖拽或点击上传 PDF 简历",
-            type=["pdf"],
-            help="请上传文字版 PDF，扫描件/图片可能无法识别",
-            label_visibility="collapsed",
-        )
-
-        if uploaded_file is not None:
-            st.success(f"已上传：**{uploaded_file.name}**")
-        else:
-            st.markdown('<div class="hint-text">未选择文件</div>', unsafe_allow_html=True)
+    if uploaded_file is not None:
+        st.success(f"已上传：**{uploaded_file.name}**")
+    else:
+        st.markdown('<div class="hint-text">未选择文件</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
     return uploaded_file
@@ -452,7 +502,7 @@ def render_score_section(score: str, analysis_text: str):
     with col1:
         st.markdown(
             f'''
-            <div class="score-card">
+            <div class="score-metric">
                 <div class="score-number">{score_num}</div>
                 <div class="score-label">简历评分 / 100</div>
             </div>
@@ -461,19 +511,17 @@ def render_score_section(score: str, analysis_text: str):
         )
 
     with col2:
-        # 提取评分理由（评分标题后的第一句话）
+        # 提取评分理由
         reason_match = re.search(r"简历评分[:：]\s*\d{1,3}/100\s*\n+(.+?)(?:\n|$)", analysis_text)
         reason = reason_match.group(1).strip() if reason_match else ""
 
         st.markdown(
             f'''
-            <div style="padding: 8px 0;">
-                <div style="font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 0.5rem;">
-                    综合评级：{get_score_badge(score_num)}
-                </div>
-                <div style="font-size: 0.95rem; color: #475569; line-height: 1.6;">
-                    {reason}
-                </div>
+            <div class="verdict-box">
+                <div class="verdict-title">综合评级</div>
+                <div class="verdict-text" style="margin-bottom: 0.75rem;">{get_score_badge(score_num)}</div>
+                <div class="verdict-title">评分理由</div>
+                <div class="verdict-text" style="font-weight: 500; color: #CBD5E1;">{reason}</div>
             </div>
             ''',
             unsafe_allow_html=True,
@@ -491,9 +539,9 @@ def render_score_section(score: str, analysis_text: str):
 
         st.markdown(
             f'''
-            <div style="background: #F1F5F9; border-radius: 12px; padding: 16px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 0.85rem; color: #64748B; margin-bottom: 4px;">投递建议</div>
-                <div style="font-size: 1rem; font-weight: 700; color: #0F172A;">{advice}</div>
+            <div class="verdict-box">
+                <div class="verdict-title">投递建议</div>
+                <div class="verdict-text">{advice}</div>
             </div>
             ''',
             unsafe_allow_html=True,
@@ -507,7 +555,6 @@ def parse_problems_and_suggestions(analysis_text: str) -> list[dict]:
     """
     items = []
 
-    # 尝试匹配 "### 主要问题" 和 "### 修改建议" 区块
     problems_match = re.search(r"#{1,3}\s*主要问题\s*\n(.*?)(?=#{1,3}\s*修改建议|$)", analysis_text, re.DOTALL)
     suggestions_match = re.search(r"#{1,3}\s*修改建议\s*\n(.*?)(?=#{1,3}|$)", analysis_text, re.DOTALL)
 
@@ -516,14 +563,12 @@ def parse_problems_and_suggestions(analysis_text: str) -> list[dict]:
 
     if problems_match:
         problems_text = problems_match.group(1).strip()
-        # 按行分割，过滤空行
         problems = [line.strip("-•* ").strip() for line in problems_text.split("\n") if line.strip()]
 
     if suggestions_match:
         suggestions_text = suggestions_match.group(1).strip()
         suggestions = [line.strip("-•* ").strip() for line in suggestions_text.split("\n") if line.strip()]
 
-    # 配对
     for i in range(max(len(problems), len(suggestions))):
         items.append(
             {
@@ -537,7 +582,6 @@ def parse_problems_and_suggestions(analysis_text: str) -> list[dict]:
 
 def render_analysis_tab(analysis_text: str):
     """渲染诊断分析 tab"""
-    # 提取问题/建议
     items = parse_problems_and_suggestions(analysis_text)
 
     if items:
@@ -545,7 +589,7 @@ def render_analysis_tab(analysis_text: str):
         for i, item in enumerate(items, 1):
             if not item["problem"] and not item["suggestion"]:
                 continue
-            with st.expander(f"问题 {i}：{item['problem'][:40]}{'...' if len(item['problem']) > 40 else ''}", expanded=False):
+            with st.expander(f"问题 {i}：{item['problem'][:45]}{'...' if len(item['problem']) > 45 else ''}", expanded=False):
                 if item["problem"]:
                     st.markdown(f"**❌ 问题：** {item['problem']}")
                 if item["suggestion"]:
@@ -555,8 +599,88 @@ def render_analysis_tab(analysis_text: str):
         st.markdown(analysis_text)
 
 
+def render_copy_button(text: str, key: str):
+    """渲染原生 JS 一键复制按钮"""
+    escaped_text = json.dumps(text)
+    html = f"""
+    <div style="text-align: right; margin-bottom: 12px;">
+        <button id="copy-btn-{key}"
+                style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 8px 16px;
+                    border-radius: 10px;
+                    border: 1px solid rgba(255,255,255,0.15);
+                    background: rgba(15, 23, 42, 0.60);
+                    color: #CBD5E1;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    font-family: inherit;
+                "
+                onmouseover="this.style.background='rgba(59, 130, 246, 0.20)';this.style.color='#FFFFFF';this.style.borderColor='rgba(59, 130, 246, 0.40)'"
+                onmouseout="this.style.background='rgba(15, 23, 42, 0.60)';this.style.color='#CBD5E1';this.style.borderColor='rgba(255,255,255,0.15)'"
+        >
+            📋 复制优化后简历
+        </button>
+    </div>
+    <script>
+        document.getElementById('copy-btn-{key}').addEventListener('click', function() {{
+            var text = {escaped_text};
+            var btn = this;
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(text).then(function() {{
+                    btn.innerHTML = '✓ 已复制';
+                    btn.style.color = '#34D399';
+                    btn.style.borderColor = 'rgba(16, 185, 129, 0.40)';
+                    setTimeout(function() {{
+                        btn.innerHTML = '📋 复制优化后简历';
+                        btn.style.color = '#CBD5E1';
+                        btn.style.borderColor = 'rgba(255,255,255,0.15)';
+                    }}, 2000);
+                }}).catch(function(err) {{
+                    console.error('Copy failed:', err);
+                    fallbackCopy(text, btn);
+                }});
+            }} else {{
+                fallbackCopy(text, btn);
+            }}
+            function fallbackCopy(textToCopy, button) {{
+                var textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {{
+                    var successful = document.execCommand('copy');
+                    if (successful) {{
+                        button.innerHTML = '✓ 已复制';
+                        button.style.color = '#34D399';
+                        setTimeout(function() {{
+                            button.innerHTML = '📋 复制优化后简历';
+                            button.style.color = '#CBD5E1';
+                        }}, 2000);
+                    }} else {{
+                        button.innerHTML = '❌ 复制失败';
+                    }}
+                }} catch (err) {{
+                    button.innerHTML = '❌ 复制失败';
+                }}
+                document.body.removeChild(textarea);
+            }}
+        }});
+    </script>
+    """
+    components.html(html, height=50)
+
+
 def render_resume_tab(resume_text: str):
     """渲染优化后简历 tab"""
+    render_copy_button(resume_text, key="resume-copy")
+
     st.markdown(
         '''
         <div class="resume-preview">
@@ -568,9 +692,9 @@ def render_resume_tab(resume_text: str):
 
 
 def main():
-    render_header()
+    render_hero()
 
-    uploaded_file = render_upload_card()
+    uploaded_file = render_upload_section()
     analyze_button = render_analyze_button(uploaded_file)
 
     if analyze_button:
@@ -629,7 +753,7 @@ def main():
         score, rest = extract_score_section(analysis_part)
 
         # 结果区域
-        st.markdown('<div class="card" style="margin-top: 2rem;">', unsafe_allow_html=True)
+        st.markdown('<div class="glass-card" style="margin-top: 2rem;">', unsafe_allow_html=True)
 
         if score:
             render_score_section(score, analysis_part)
@@ -642,12 +766,12 @@ def main():
         tab_analysis, tab_resume = st.tabs(["💡 诊断分析", "✨ 优化后简历"])
 
         with tab_analysis:
-            st.markdown('<div class="card" style="margin-top: 0;">', unsafe_allow_html=True)
+            st.markdown('<div class="glass-card" style="margin-top: 0;">', unsafe_allow_html=True)
             render_analysis_tab(analysis_part)
             st.markdown('</div>', unsafe_allow_html=True)
 
         with tab_resume:
-            st.markdown('<div class="card" style="margin-top: 0;">', unsafe_allow_html=True)
+            st.markdown('<div class="glass-card" style="margin-top: 0;">', unsafe_allow_html=True)
             if resume_part:
                 render_resume_tab(resume_part)
             else:
