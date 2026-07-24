@@ -21,14 +21,30 @@ load_dotenv()
 
 def get_background_css() -> str:
     """
-    读取 assets/background.jpg 并转为 base64 CSS 背景
+    读取 assets/background.* 图片并转为 base64 CSS 背景
+    支持 png / jpg / jpeg / webp
     如果图片不存在，返回空字符串（使用默认背景色）
     """
-    image_path = Path("assets/background.jpg")
-    if image_path.exists():
-        with open(image_path, "rb") as img_file:
-            encoded = base64.b64encode(img_file.read()).decode()
-        return f"url('data:image/jpeg;base64,{encoded}')"
+    candidates = ["assets/background.png", "assets/background.jpg", "assets/background.jpeg", "assets/background.webp"]
+
+    for candidate in candidates:
+        image_path = Path(candidate)
+        if not image_path.exists():
+            continue
+
+        data = image_path.read_bytes()
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            mime = "image/png"
+        elif data.startswith(b"\xff\xd8"):
+            mime = "image/jpeg"
+        elif data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+            mime = "image/webp"
+        else:
+            continue
+
+        encoded = base64.b64encode(data).decode()
+        return f"url('data:{mime};base64,{encoded}')"
+
     return ""
 
 
