@@ -9,7 +9,7 @@ from io import BytesIO
 from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor
+from docx.shared import Cm, Pt, RGBColor
 
 
 def extract_optimized_resume(analysis_text: str) -> str:
@@ -40,6 +40,33 @@ def extract_optimized_resume(analysis_text: str) -> str:
     return ""
 
 
+def _set_cell_font(run, font_name="微软雅黑", font_size=Pt(10.5), bold=False, color=RGBColor(0, 0, 0)):
+    """统一设置 run 的字体"""
+    run.font.name = font_name
+    run.font.size = font_size
+    run.font.bold = bold
+    run.font.color.rgb = color
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), font_name)
+
+
+def _parse_inline_formatting(paragraph, text: str):
+    """
+    解析行内 **加粗** 并写入段落
+    """
+    # 按 ** 分段
+    parts = re.split(r"(\*\*.*?\*\*)", text)
+    for part in parts:
+        if not part:
+            continue
+        run = paragraph.add_run()
+        if part.startswith("**") and part.endswith("**"):
+            run.text = part[2:-2]
+            run.bold = True
+        else:
+            run.text = part
+        _set_cell_font(run)
+
+
 def create_resume_docx(resume_text: str) -> BytesIO:
     """
     把简历文本转换为 Word 文档
@@ -52,51 +79,73 @@ def create_resume_docx(resume_text: str) -> BytesIO:
     """
     doc = Document()
 
+    # 设置页面边距（窄边距，适合简历）
+    sections = doc.sections[0]
+    sections.top_margin = Cm(1.5)
+    sections.bottom_margin = Cm(1.5)
+    sections.left_margin = Cm(1.8)
+    sections.right_margin = Cm(1.8)
+
     # 设置默认字体
     style = doc.styles["Normal"]
-    style.font.name = "宋体"
+    style.font.name = "微软雅黑"
     style.font.size = Pt(10.5)
-    style._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+    style._element.rPr.rFonts.set(qn("w:eastAsia"), "微软雅黑")
 
-    # 逐行写入
-    for line in resume_text.split("\n"):
-        line = line.strip()
-        if not line:
+    # 按行处理，识别标题层级和列表
+    lines = resume_text.split("\n")
+    in_list = False
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        if not line.strip():
+            in_list = False
             continue
 
-        # 判断是否是标题行（比如"教育背景"、"工作经历"等）
-        section_titles = [
-            "个人信息",
-            "求职意向",
-            "教育背景",
-            "工作经历",
-            "项目经历",
-            "项目经验",
-            "技能",
-            "技能证书",
-            "专业技能",
-            "自我评价",
-            "荣誉证书",
-        ]
+        stripped = line.strip()
 
-        is_title = any(
-            line == title or line.startswith(title + " ") or line.startswith(title + "|")
-            for title in section_titles
-        )
+        # 判断标题层级
+        heading_match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+        if heading_match:
+            level = len(heading_match.group(1))
+            title_text = heading_match.group(2).strip()
 
-        if is_title or line.endswith("：") or line.endswith(":"):
-            # 标题样式
-            p = doc.add_paragraph(line)
-            run = p.runs[0]
-            run.bold = True
-            run.font.size = Pt(12)
-            run.font.color.rgb = RGBColor(0, 0, 0)
-            p.space_before = Pt(12)
-            p.space_after = Pt(6)
-        else:
-            # 正文
-            p = doc.add_paragraph(line)
+            p = doc.add_paragraph()
+            p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            _parse_inline_formatting(p, title_text)
+            # 设置标题格式
+            for run in p.runs:
+                run.bold = True
+                if level == 1:
+                    run.font.size = Pt(16)
+                    p.space_before = Pt(14)
+                    p.space_after = Pt(8)
+                elif level == 2:
+                    run.font.size = Pt(13)
+                    p.space_before = Pt(12)
+                    p.space_after = Pt(6)
+                else:
+                    run.font.size = Pt(11)
+                    p.space_before = Pt(8)
+                    p.space_after = Pt(4)
+            in_list = False
+            continue
+
+        # 判断列表项
+        list_match = re.match(r"^([\*\-\•])\s+(.+)$", stripped)
+        if list_match:
+            content = list_match.group(2).strip()
+            p = doc.add_paragraph(style="List Bullet")
+            _parse_inline_formatting(p, content)
             p.space_after = Pt(3)
+            in_list = True
+            continue
+
+        # 普通段落
+        p = doc.add_paragraph()
+        _parse_inline_formatting(p, stripped)
+        p.space_after = Pt(4)
+        in_list = False
 
     # 保存到字节流
     buffer = BytesIO()
