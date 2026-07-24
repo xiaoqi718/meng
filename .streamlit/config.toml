@@ -5,10 +5,10 @@ gatherUsageStats = false
 headless = true
 
 [theme]
-primaryColor = "#FF6B6B"
-backgroundColor = "#0f172a"
-secondaryBackgroundColor = "rgba(30, 41, 59, 0.8)"
-textColor = "#f8fafc"
+primaryColor = "#5D8C2E"
+backgroundColor = "#1a1f1a"
+secondaryBackgroundColor = "#2d3a25"
+textColor = "#f0f0d8"
 font = "sans serif"
 
 [client]

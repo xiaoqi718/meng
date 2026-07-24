@@ -7,8 +7,9 @@ import re
 from io import BytesIO
 
 from docx import Document
-from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.oxml.ns import qn
+from docx.shared import Pt, RGBColor
 
 
 def extract_optimized_resume(analysis_text: str) -> str:
@@ -55,7 +56,7 @@ def create_resume_docx(resume_text: str) -> BytesIO:
     style = doc.styles["Normal"]
     style.font.name = "宋体"
     style.font.size = Pt(10.5)
-    style._element.rPr.rFonts.set("w:eastAsia", "宋体")
+    style._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
 
     # 逐行写入
     for line in resume_text.split("\n"):
