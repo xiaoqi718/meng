@@ -2,6 +2,7 @@ streamlit>=1.30.0
 pdfplumber>=0.10.0
 openai>=1.0.0
 python-dotenv>=1.0.0
+python-docx>=1.1.0
 
 # 开发测试用（生成示例 PDF）
 reportlab>=4.0.0
