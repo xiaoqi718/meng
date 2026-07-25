@@ -4,10 +4,12 @@ Streamlit 前端主程序
 """
 
 import base64
+import html
 import json
 import os
 import re
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
@@ -19,6 +21,16 @@ from src.resume_parser import extract_text_from_pdf
 
 # 加载 .env 文件
 load_dotenv()
+
+
+@dataclass
+class ChangeBlock:
+    """AI 输出的逐段修改块"""
+
+    section: str
+    original: str
+    modified: str
+    reason: str
 
 
 def get_background_css() -> str:
@@ -54,20 +66,20 @@ def get_background_css() -> str:
 st.set_page_config(
     page_title="meng - AI 简历优化器",
     page_icon="✨",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 bg_image = get_background_css()
 
-# 自定义样式：深色玻璃拟态
+# 自定义样式：深色玻璃拟态 + 简历精修页风格
 st.markdown(
     f"""
     <style>
     /* 页面背景：深色 + 星空图 */
     .stApp {{
         background:
-            radial-gradient(ellipse at top, rgba(15, 23, 42, 0.75), rgba(2, 6, 23, 0.92)),
+            radial-gradient(ellipse at top, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.95)),
             {bg_image if bg_image else "linear-gradient(180deg, #020617 0%, #0F172A 100%)"}
             center/cover no-repeat fixed;
         color: #F8FAFC;
@@ -80,14 +92,14 @@ st.markdown(
 
     /* 主容器 */
     .main .block-container {{
-        max-width: 1100px;
-        padding-top: 3rem;
+        max-width: 1400px;
+        padding-top: 2rem;
         padding-bottom: 4rem;
     }}
 
     /* 玻璃卡片 */
     .glass-card {{
-        background: rgba(15, 23, 42, 0.60);
+        background: rgba(15, 23, 42, 0.58);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border-radius: 20px;
@@ -114,42 +126,178 @@ st.markdown(
     /* Hero 区域 */
     .hero {{
         text-align: center;
-        margin-bottom: 3rem;
-        padding: 2rem 0;
+        margin-bottom: 2.5rem;
+        padding: 1.5rem 0 1rem 0;
+    }}
+
+    .hero-topbar {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 1200px;
+        margin: 0 auto 2rem auto;
+        padding: 0 1rem;
     }}
 
     .hero-badge {{
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 16px;
+        padding: 8px 18px;
         border-radius: 999px;
-        background: rgba(59, 130, 246, 0.15);
-        border: 1px solid rgba(59, 130, 246, 0.25);
-        color: #60A5FA;
+        background: rgba(217, 179, 120, 0.12);
+        border: 1px solid rgba(217, 179, 120, 0.25);
+        color: #D9B378;
         font-size: 0.85rem;
         font-weight: 600;
-        margin-bottom: 1.25rem;
+    }}
+
+    .hero-view-toggle {{
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #CBD5E1;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: default;
+    }}
+
+    .hero-eyebrow {{
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #D9B378;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
     }}
 
     .hero-title {{
-        font-size: 3rem !important;
+        font-size: 3.2rem !important;
         font-weight: 800 !important;
-        color: #F8FAFC !important;
         letter-spacing: -2px;
         margin-bottom: 0.75rem !important;
-        background: linear-gradient(135deg, #F8FAFC 0%, #60A5FA 50%, #818CF8 100%);
+        background: linear-gradient(135deg, #F8FAFC 0%, #D9B378 50%, #C9A86C 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }}
 
     .hero-subtitle {{
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         color: #94A3B8;
         line-height: 1.6;
         max-width: 560px;
         margin: 0 auto;
+    }}
+
+    /* 统计区 */
+    .stats-row {{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 64px;
+        margin: 2.5rem 0 1rem 0;
+        flex-wrap: wrap;
+    }}
+
+    .stat-item {{
+        text-align: center;
+        min-width: 120px;
+    }}
+
+    .stat-number {{
+        font-size: 2.4rem;
+        font-weight: 800;
+        color: #F8FAFC;
+        line-height: 1;
+        margin-bottom: 0.4rem;
+        background: linear-gradient(135deg, #F8FAFC 0%, #D9B378 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }}
+
+    .stat-label {{
+        font-size: 0.85rem;
+        color: #94A3B8;
+        font-weight: 500;
+    }}
+
+    .stat-divider {{
+        width: 1px;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.10);
+    }}
+
+    /* 步骤卡片 */
+    .steps-row {{
+        display: flex;
+        gap: 20px;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }}
+
+    .step-card {{
+        flex: 1;
+        min-width: 260px;
+        background: rgba(15, 23, 42, 0.50);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        padding: 24px;
+        transition: all 0.25s ease;
+    }}
+
+    .step-card.active {{
+        border: 1px solid rgba(59, 130, 246, 0.55);
+        background: rgba(59, 130, 246, 0.12);
+        box-shadow: 0 0 24px rgba(59, 130, 246, 0.20);
+    }}
+
+    .step-card.completed {{
+        border-color: rgba(16, 185, 129, 0.40);
+    }}
+
+    .step-number {{
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        color: #CBD5E1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 14px;
+    }}
+
+    .step-card.active .step-number {{
+        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
+        color: #fff;
+    }}
+
+    .step-card.completed .step-number {{
+        background: rgba(16, 185, 129, 0.20);
+        color: #34D399;
+    }}
+
+    .step-title {{
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #F8FAFC;
+        margin-bottom: 8px;
+    }}
+
+    .step-desc {{
+        font-size: 0.88rem;
+        color: #94A3B8;
+        line-height: 1.6;
     }}
 
     /* 上传区 */
@@ -257,62 +405,72 @@ st.markdown(
     .badge-warning {{ background: rgba(245, 158, 11, 0.15); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.25); }}
     .badge-danger {{ background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.25); }}
 
-    /* Tabs - pill 样式 */
-    .stTabs [data-baseweb="tab-list"] {{
-        gap: 10px;
-        border-bottom: none;
-        margin-bottom: 1.5rem;
+    /* 对比区 */
+    .compare-section {{
+        margin-top: 1.5rem;
     }}
 
-    .stTabs [data-baseweb="tab"] {{
-        padding: 10px 22px;
+    .compare-card {{
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        padding: 24px;
+        margin-bottom: 20px;
+    }}
+
+    .section-badge {{
+        display: inline-block;
+        padding: 5px 14px;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.15);
+        color: #60A5FA;
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin-bottom: 16px;
+    }}
+
+    .compare-label {{
+        font-size: 0.85rem;
         font-weight: 600;
         color: #94A3B8;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(15, 23, 42, 0.40);
+        margin-bottom: 8px;
     }}
 
-    .stTabs [aria-selected="true"] {{
-        color: #FFFFFF !important;
-        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%) !important;
-        border-color: transparent !important;
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
-    }}
-
-    /* Expander */
-    .streamlit-expanderHeader {{
-        font-weight: 600 !important;
-        color: #F8FAFC !important;
-        background: rgba(15, 23, 42, 0.40);
+    .original-box, .modified-box {{
+        background: rgba(2, 6, 23, 0.45);
         border-radius: 12px;
-        padding: 14px 18px !important;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 18px;
+        font-size: 0.92rem;
+        line-height: 1.75;
+        white-space: pre-wrap;
+        color: #CBD5E1;
+        min-height: 80px;
+        font-family: inherit;
     }}
 
-    .streamlit-expander {{
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        margin-bottom: 12px;
-        background: rgba(15, 23, 42, 0.30);
+    .modified-box {{
+        border-left: 3px solid #3B82F6;
+        color: #F8FAFC;
+        background: rgba(59, 130, 246, 0.08);
     }}
 
-    /* 提示框 */
-    .stAlert {{
-        background: rgba(15, 23, 42, 0.60) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 14px !important;
+    .reason-box {{
+        margin-top: 16px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.20);
+        color: #E2E8F0;
+        font-size: 0.92rem;
+        line-height: 1.7;
     }}
 
-    .stAlert [data-testid="stMarkdownContainer"] p {{
-        color: #F8FAFC !important;
-    }}
-
-    /* 分隔线 */
-    hr {{
-        border: none !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-        margin: 1.5rem 0 !important;
+    .reason-label {{
+        color: #FBBF24;
+        font-weight: 700;
+        margin-right: 8px;
     }}
 
     /* 简历预览 */
@@ -345,9 +503,30 @@ st.markdown(
         margin-top: 0.5rem;
     }}
 
-    /* 进度条 */
-    .stProgress > div > div {{
-        background: linear-gradient(90deg, #3B82F6 0%, #6366F1 100%) !important;
+    /* 提示框 */
+    .stAlert {{
+        background: rgba(15, 23, 42, 0.60) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 14px !important;
+    }}
+
+    .stAlert [data-testid="stMarkdownContainer"] p {{
+        color: #F8FAFC !important;
+    }}
+
+    /* 分隔线 */
+    hr {{
+        border: none !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        margin: 1.5rem 0 !important;
+    }}
+
+    /* 响应式 */
+    @media (max-width: 768px) {{
+        .hero-title {{ font-size: 2.2rem !important; }}
+        .stats-row {{ gap: 32px; }}
+        .stat-divider {{ display: none; }}
+        .step-card {{ min-width: 100%; }}
     }}
     </style>
     """,
@@ -393,6 +572,32 @@ def split_analysis_result(text: str) -> tuple[str, str]:
     return text, ""
 
 
+def parse_change_blocks(text: str) -> list[ChangeBlock]:
+    """
+    从 AI 输出中解析逐段修改块
+    """
+    blocks = []
+    pattern = re.compile(r"===CHANGE_BLOCK_START===(.*?)===CHANGE_BLOCK_END===", re.DOTALL)
+    field_patterns = {
+        "section": re.compile(r"===SECTION===\s*(.*?)\s*(?====[A-Z]+===|$)", re.DOTALL),
+        "original": re.compile(r"===ORIGINAL===\s*(.*?)\s*(?====[A-Z]+===|$)", re.DOTALL),
+        "modified": re.compile(r"===MODIFIED===\s*(.*?)\s*(?====[A-Z]+===|$)", re.DOTALL),
+        "reason": re.compile(r"===REASON===\s*(.*?)\s*(?====[A-Z]+===|$)", re.DOTALL),
+    }
+
+    for match in pattern.finditer(text):
+        raw = match.group(1)
+        fields = {}
+        for key, field_pattern in field_patterns.items():
+            field_match = field_pattern.search(raw)
+            fields[key] = field_match.group(1).strip() if field_match else ""
+
+        if any(fields.values()):
+            blocks.append(ChangeBlock(**fields))
+
+    return blocks
+
+
 def get_api_key() -> str:
     """
     获取 DeepSeek API Key
@@ -421,16 +626,23 @@ def get_score_badge(score_num: int) -> str:
 
 
 def render_hero():
-    """渲染顶部 Hero"""
+    """渲染顶部 Hero，复刻参考图风格"""
     st.markdown(
         '''
+        <div class="hero-topbar">
+            <div class="hero-badge">◆ 简历精修</div>
+            <div class="hero-view-toggle">面试官视角</div>
+        </div>
         <div class="hero">
-            <div class="hero-badge">
-                ✨ AI 驱动的简历优化
-            </div>
-            <div class="hero-title">meng 简历优化器</div>
-            <div class="hero-subtitle">
-                10 年资深 HR + 行业专家视角，帮你找出简历真正的问题，直接输出能投递的优化版本
+            <div class="hero-eyebrow">RESUME OPTIMIZATION</div>
+            <div class="hero-title">简历精修优化</div>
+            <div class="hero-subtitle">让你的简历 · 不再石沉大海</div>
+            <div class="stats-row">
+                <div class="stat-item"><div class="stat-number">AI</div><div class="stat-label">实时分析</div></div>
+                <div class="stat-divider"></div>
+                <div class="stat-item"><div class="stat-number">3 步</div><div class="stat-label">完成优化</div></div>
+                <div class="stat-divider"></div>
+                <div class="stat-item"><div class="stat-number">24h</div><div class="stat-label">随时可用</div></div>
             </div>
         </div>
         ''',
@@ -438,9 +650,36 @@ def render_hero():
     )
 
 
+def render_steps(active: int = 0):
+    """渲染三个步骤卡片，active 为当前激活步骤（1/2/3）"""
+    steps = [
+        ("1", "全面诊断", "逐条审查找出硬伤，出具详细分析报告"),
+        ("2", "精修优化", "提炼亮点数据表达，亲手帮你改到满意"),
+        ("3", "岗位匹配", "行业定向关键词优化，通过 ATS 机器筛选"),
+    ]
+
+    cards_html = '<div class="steps-row">'
+    for i, (num, title, desc) in enumerate(steps, 1):
+        cls = "step-card"
+        if i == active:
+            cls += " active"
+        elif i < active:
+            cls += " completed"
+        cards_html += (
+            f'<div class="{cls}">'
+            f'<div class="step-number">{num}</div>'
+            f'<div class="step-title">{title}</div>'
+            f'<div class="step-desc">{desc}</div>'
+            f'</div>'
+        )
+    cards_html += '</div>'
+
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+
 def render_upload_section():
     """渲染上传区"""
-    st.markdown('<div class="glass-card" style="text-align: center; max-width: 640px; margin: 0 auto 2rem auto;">', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card" style="text-align: center; max-width: 720px; margin: 0 auto 2rem auto;">', unsafe_allow_html=True)
 
     st.markdown(
         '''
@@ -482,14 +721,6 @@ def render_analyze_button(uploaded_file):
         )
 
 
-def render_progress(step: int):
-    """渲染步骤进度 1=读取 2=分析 3=完成"""
-    steps = ["读取 PDF 内容", "AI 审阅简历", "生成优化版本"]
-    progress_value = step / len(steps)
-    current_label = steps[step - 1] if 1 <= step <= len(steps) else "完成"
-    st.progress(progress_value, text=f"步骤 {step}/{len(steps)}：{current_label}")
-
-
 def render_score_section(score: str, analysis_text: str):
     """渲染评分和摘要"""
     try:
@@ -512,7 +743,7 @@ def render_score_section(score: str, analysis_text: str):
 
     with col2:
         # 提取评分理由
-        reason_match = re.search(r"简历评分[:：]\s*\d{1,3}/100\s*\n+(.+?)(?:\n|$)", analysis_text)
+        reason_match = re.search(r"简历评分[:：]\s*\d{{1,3}}/100\s*\n+(.+?)(?:\n|$)", analysis_text)
         reason = reason_match.group(1).strip() if reason_match else ""
 
         st.markdown(
@@ -521,7 +752,7 @@ def render_score_section(score: str, analysis_text: str):
                 <div class="verdict-title">综合评级</div>
                 <div class="verdict-text" style="margin-bottom: 0.75rem;">{get_score_badge(score_num)}</div>
                 <div class="verdict-title">评分理由</div>
-                <div class="verdict-text" style="font-weight: 500; color: #CBD5E1;">{reason}</div>
+                <div class="verdict-text" style="font-weight: 500; color: #CBD5E1;">{html.escape(reason)}</div>
             </div>
             ''',
             unsafe_allow_html=True,
@@ -548,61 +779,36 @@ def render_score_section(score: str, analysis_text: str):
         )
 
 
-def parse_problems_and_suggestions(analysis_text: str) -> list[dict]:
-    """
-    从分析文本中提取主要问题和修改建议
-    返回 [{problem, suggestion}, ...]
-    """
-    items = []
+def render_change_block_card(block: ChangeBlock, index: int):
+    """渲染单个改前改后对比卡片"""
+    section = html.escape(block.section)
+    original = html.escape(block.original)
+    modified = html.escape(block.modified)
+    reason = html.escape(block.reason).replace("\n", "<br>")
 
-    problems_match = re.search(r"#{1,3}\s*主要问题\s*\n(.*?)(?=#{1,3}\s*修改建议|$)", analysis_text, re.DOTALL)
-    suggestions_match = re.search(r"#{1,3}\s*修改建议\s*\n(.*?)(?=#{1,3}|$)", analysis_text, re.DOTALL)
+    st.markdown(
+        f'<div class="compare-card"><div class="section-badge">{section}</div>',
+        unsafe_allow_html=True,
+    )
 
-    problems = []
-    suggestions = []
+    left, right = st.columns(2)
+    with left:
+        st.markdown('<div class="compare-label">❌ 改前</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="original-box">{original}</div>', unsafe_allow_html=True)
+    with right:
+        st.markdown('<div class="compare-label">✅ 改后</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="modified-box">{modified}</div>', unsafe_allow_html=True)
 
-    if problems_match:
-        problems_text = problems_match.group(1).strip()
-        problems = [line.strip("-•* ").strip() for line in problems_text.split("\n") if line.strip()]
-
-    if suggestions_match:
-        suggestions_text = suggestions_match.group(1).strip()
-        suggestions = [line.strip("-•* ").strip() for line in suggestions_text.split("\n") if line.strip()]
-
-    for i in range(max(len(problems), len(suggestions))):
-        items.append(
-            {
-                "problem": problems[i] if i < len(problems) else "",
-                "suggestion": suggestions[i] if i < len(suggestions) else "",
-            }
-        )
-
-    return items
-
-
-def render_analysis_tab(analysis_text: str):
-    """渲染诊断分析 tab"""
-    items = parse_problems_and_suggestions(analysis_text)
-
-    if items:
-        st.markdown('<div class="card-title">🔍 主要问题与修改建议</div>', unsafe_allow_html=True)
-        for i, item in enumerate(items, 1):
-            if not item["problem"] and not item["suggestion"]:
-                continue
-            with st.expander(f"问题 {i}：{item['problem'][:45]}{'...' if len(item['problem']) > 45 else ''}", expanded=False):
-                if item["problem"]:
-                    st.markdown(f"**❌ 问题：** {item['problem']}")
-                if item["suggestion"]:
-                    st.markdown(f"**✅ 建议：** {item['suggestion']}")
-    else:
-        st.info("未识别到结构化的问题和建议，下面是完整分析内容：")
-        st.markdown(analysis_text)
+    st.markdown(
+        f'<div class="reason-box"><span class="reason-label">HR 判断</span>{reason}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_copy_button(text: str, key: str):
     """渲染原生 JS 一键复制按钮"""
     escaped_text = json.dumps(text)
-    html = f"""
+    html_code = f"""
     <div style="text-align: right; margin-bottom: 12px;">
         <button id="copy-btn-{key}"
                 style="
@@ -674,7 +880,7 @@ def render_copy_button(text: str, key: str):
         }});
     </script>
     """
-    components.html(html, height=50)
+    components.html(html_code, height=50)
 
 
 def render_resume_tab(resume_text: str):
@@ -691,14 +897,77 @@ def render_resume_tab(resume_text: str):
     st.markdown('</div>', unsafe_allow_html=True)
 
 
+def render_results(result_text: str):
+    """渲染完整结果：评分 + 改前改后对比 + 优化后简历"""
+    analysis_part, resume_part = split_analysis_result(result_text)
+    score, _ = extract_score_section(analysis_part)
+    change_blocks = parse_change_blocks(analysis_part)
+
+    # 评分区
+    st.markdown('<div class="glass-card" style="margin-top: 1rem;">', unsafe_allow_html=True)
+    if score:
+        render_score_section(score, analysis_part)
+    else:
+        st.info("未识别到评分，下面是完整分析结果：")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # 改前改后对比区
+    if change_blocks:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="margin-bottom: 0.25rem;">🔍 逐段精修对比</div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-subtitle" style="margin-bottom: 1rem;">下面是每一处改动的原文、优化版本和 HR 判断依据。</div>', unsafe_allow_html=True)
+        for i, block in enumerate(change_blocks):
+            render_change_block_card(block, i)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.info("未识别到结构化的逐段修改，下面是完整分析内容：")
+        st.markdown(analysis_part)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # 完整优化简历
+    if resume_part:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="margin-bottom: 1rem;">✨ 完整优化后简历</div>', unsafe_allow_html=True)
+        render_resume_tab(resume_part)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+def init_session():
+    """初始化 session_state"""
+    defaults = {
+        "stage": "idle",
+        "resume_text": "",
+        "result": None,
+        "error": None,
+        "filename": "",
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
 def main():
+    init_session()
     render_hero()
 
     uploaded_file = render_upload_section()
     analyze_button = render_analyze_button(uploaded_file)
 
+    # 如果上传了新文件，清空之前的结果
+    if uploaded_file is not None and uploaded_file.name != st.session_state.filename:
+        st.session_state.filename = uploaded_file.name
+        st.session_state.stage = "idle"
+        st.session_state.result = None
+        st.session_state.error = None
+
+    # 显示错误并重置
+    if st.session_state.error:
+        st.error(st.session_state.error)
+        st.session_state.error = None
+
+    # 点击分析按钮：校验并进入 parsing 阶段
     if analyze_button:
-        # 校验
         api_key = get_api_key()
         if not api_key:
             st.error(
@@ -712,8 +981,13 @@ def main():
             st.error("⚠️ 请先上传简历 PDF")
             return
 
-        # 步骤 1：读取 PDF
-        render_progress(1)
+        st.session_state.stage = "parsing"
+        st.session_state.error = None
+        st.rerun()
+
+    # 阶段 1：读取 PDF
+    if st.session_state.stage == "parsing":
+        render_steps(active=1)
         with st.spinner("正在读取 PDF..."):
             try:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -724,59 +998,45 @@ def main():
                 Path(tmp_path).unlink(missing_ok=True)
 
                 if len(resume_text.strip()) < 50:
-                    st.error("⚠️ 简历内容太短，可能 PDF 无法提取文字，请上传文字版 PDF")
-                    return
+                    raise ValueError("简历内容太短，可能 PDF 无法提取文字，请上传文字版 PDF")
+
+                st.session_state.resume_text = resume_text
+                st.session_state.stage = "analyzing"
+                st.rerun()
 
             except Exception as e:
-                st.error(f"❌ 简历读取失败：{e}")
-                return
+                st.session_state.error = f"❌ 简历读取失败：{e}"
+                st.session_state.stage = "idle"
+                st.rerun()
 
-        # 步骤 2：AI 分析
-        render_progress(2)
+    # 阶段 2：AI 分析
+    if st.session_state.stage == "analyzing":
+        render_steps(active=2)
         with st.spinner("AI 正在审阅简历..."):
             try:
                 result = analyze_resume(
-                    resume_text=resume_text,
-                    api_key=api_key,
+                    resume_text=st.session_state.resume_text,
+                    api_key=get_api_key(),
                     model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
                     base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
                 )
+                st.session_state.result = result
+                st.session_state.stage = "done"
+                st.rerun()
+
             except Exception as e:
-                st.error(f"❌ AI 分析失败：{e}")
-                return
+                st.session_state.error = f"❌ AI 分析失败：{e}"
+                st.session_state.stage = "idle"
+                st.rerun()
 
-        # 步骤 3：完成
-        render_progress(3)
-
-        # 拆分分析结果
-        analysis_part, resume_part = split_analysis_result(result)
-        score, rest = extract_score_section(analysis_part)
-
-        # 结果区域
-        st.markdown('<div class="glass-card" style="margin-top: 2rem;">', unsafe_allow_html=True)
-
-        if score:
-            render_score_section(score, analysis_part)
+    # 阶段 3：完成并展示结果
+    if st.session_state.stage == "done":
+        render_steps(active=3)
+        if st.session_state.result:
+            render_results(st.session_state.result)
         else:
-            st.info("未识别到评分，下面是完整分析结果：")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Tabs
-        tab_analysis, tab_resume = st.tabs(["💡 诊断分析", "✨ 优化后简历"])
-
-        with tab_analysis:
-            st.markdown('<div class="glass-card" style="margin-top: 0;">', unsafe_allow_html=True)
-            render_analysis_tab(analysis_part)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with tab_resume:
-            st.markdown('<div class="glass-card" style="margin-top: 0;">', unsafe_allow_html=True)
-            if resume_part:
-                render_resume_tab(resume_part)
-            else:
-                st.warning("未从分析结果中提取到优化后的简历")
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.session_state.stage = "idle"
+            st.rerun()
 
 
 if __name__ == "__main__":
